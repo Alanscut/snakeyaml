@@ -153,10 +153,8 @@ public class ParserImpl implements Parser {
      * Get the next event.
      */
     public Event peekEvent() {
-        if (currentEvent == null) {
-            if (state != null) {
-                currentEvent = state.produce();
-            }
+        if (currentEvent == null && state != null) {
+            currentEvent = state.produce();
         }
         return currentEvent;
     }

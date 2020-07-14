@@ -318,22 +318,20 @@ public abstract class BaseConstructor {
                 return instance;
             }
         }
-        if (tryDefault) {
+        if (tryDefault && ancestor.isAssignableFrom(type) && !Modifier.isAbstract(type.getModifiers())) {
             /*
              * Removed <code> have InstantiationException in case of abstract
              * type
              */
-            if (ancestor.isAssignableFrom(type) && !Modifier.isAbstract(type.getModifiers())) {
-                try {
-                    java.lang.reflect.Constructor<?> c = type.getDeclaredConstructor();
-                    c.setAccessible(true);
-                    return c.newInstance();
-                } catch (NoSuchMethodException e) {
-                    throw new InstantiationException("NoSuchMethodException:"
-                            + e.getLocalizedMessage());
-                } catch (Exception e) {
-                    throw new YAMLException(e);
-                }
+            try {
+                java.lang.reflect.Constructor<?> c = type.getDeclaredConstructor();
+                c.setAccessible(true);
+                return c.newInstance();
+            } catch (NoSuchMethodException e) {
+                throw new InstantiationException("NoSuchMethodException:"
+                        + e.getLocalizedMessage());
+            } catch (Exception e) {
+                throw new YAMLException(e);
             }
         }
         throw new InstantiationException();

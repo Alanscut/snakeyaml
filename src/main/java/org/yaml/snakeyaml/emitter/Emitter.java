@@ -149,6 +149,7 @@ public final class Emitter implements Emitable {
     private final boolean allowUnicode;
     private int bestIndent;
     private final int indicatorIndent;
+    private final boolean indentWithIndicator;
     private int bestWidth;
     private final char[] bestLineBreak;
     private final boolean splitLines;
@@ -206,6 +207,7 @@ public final class Emitter implements Emitable {
             this.bestIndent = opts.getIndent();
         }
         this.indicatorIndent = opts.getIndicatorIndent();
+        this.indentWithIndicator = opts.getIndentWithIndicator();
         this.bestWidth = 80;
         if (opts.getWidth() > this.bestIndent * 2) {
             this.bestWidth = opts.getWidth();
@@ -1124,8 +1126,14 @@ public final class Emitter implements Emitable {
             indent = 0;
         }
 
-        if (!this.indention || this.column > indent || (this.column == indent && !this.whitespace)) {
-            writeLineBreak(null);
+        if(!this.indentWithIndicator) {
+            if (!this.indention || this.column > indent || (this.column == indent && !this.whitespace)) {
+                writeLineBreak(null);
+            }
+        } else {
+            if (!this.indention || (this.column == indent && !this.whitespace)) {
+                writeLineBreak(null);
+            }
         }
 
         writeWhitespace(indent - this.column);

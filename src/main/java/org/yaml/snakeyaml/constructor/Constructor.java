@@ -237,8 +237,7 @@ public class Constructor extends SafeConstructor {
 
                     valueNode.setType(property.getType());
                     final boolean typeDetected = (memberDescription != null)
-                            ? memberDescription.setupPropertyType(key, valueNode)
-                            : false;
+                            && memberDescription.setupPropertyType(key, valueNode);
                     if (!typeDetected && valueNode.getNodeId() != NodeId.scalar) {
                         // only if there is no explicit TypeDescription
                         Class<?>[] arguments = property.getActualTypeArguments();
@@ -269,10 +268,9 @@ public class Constructor extends SafeConstructor {
                             : constructObject(valueNode);
                     // Correct when the property expects float but double was
                     // constructed
-                    if (property.getType() == Float.TYPE || property.getType() == Float.class) {
-                        if (value instanceof Double) {
-                            value = ((Double) value).floatValue();
-                        }
+                    if (property.getType() == Float.TYPE || property.getType() == Float.class
+                            && value instanceof Double) {
+                        value = ((Double) value).floatValue();
                     }
                     // Correct when the property a String but the value is binary
                     if (property.getType() == String.class && Tag.BINARY.equals(valueNode.getTag())
@@ -602,7 +600,7 @@ public class Constructor extends SafeConstructor {
                     }
                 }
                 throw new YAMLException(
-                        "No suitable constructor with " + String.valueOf(snode.getValue().size())
+                        "No suitable constructor with " + snode.getValue().size()
                                 + " arguments found for " + node.getType());
 
             }
