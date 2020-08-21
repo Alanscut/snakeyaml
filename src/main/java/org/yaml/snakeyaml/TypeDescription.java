@@ -15,14 +15,8 @@
  */
 package org.yaml.snakeyaml;
 
-import java.util.Collection;
+import java.util.*;
 
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.Map;
-import java.util.Set;
 import java.util.logging.Logger;
 
 import org.yaml.snakeyaml.error.YAMLException;
@@ -62,7 +56,9 @@ public class TypeDescription {
 
     private Map<String, PropertySubstitute> properties = Collections.emptyMap();
 
-    protected Set<String> excludes = Collections.emptySet();
+    protected Set<String> excludes = new HashSet<>();// Collections.emptySet();
+    protected Map<String, Class<?>> excludeMap = new HashMap<>();
+
     protected String[] includes = null;
     protected BeanAccess beanAccess;
 
@@ -290,6 +286,10 @@ public class TypeDescription {
         }
         substitute.setTargetType(type);
         properties.put(substitute.getName(), substitute);
+        if (substitute.getSourceName() != null) {
+            excludes.add(substitute.getSourceName());
+            excludeMap.put(substitute.getSourceName(), substitute.getSourceType());
+        }
     }
 
     public void setPropertyUtils(PropertyUtils propertyUtils) {
@@ -313,6 +313,7 @@ public class TypeDescription {
     }
 
     public Set<Property> getProperties() {
+//        excludes = excludeMap.keySet();
         if (dumpProperties != null) {
             return dumpProperties;
         }
@@ -333,12 +334,14 @@ public class TypeDescription {
                     : propertyUtils.getProperties(type, beanAccess);
 
             if (properties.isEmpty()) {
-                if (excludes.isEmpty()) {
+                if (excludes.isEmpty() && excludeMap.isEmpty()) {
                     return dumpProperties = readableProps;
                 }
                 dumpProperties = new LinkedHashSet<Property>();
                 for (Property property : readableProps) {
-                    if (!excludes.contains(property.getName())) {
+                    if (!(excludes.contains(property.getName())
+                            || (excludeMap.containsKey(property.getName())
+                            && excludeMap.get(property.getName()).equals(property.getType())))) {
                         dumpProperties.add(property);
                     }
                 }
@@ -352,13 +355,13 @@ public class TypeDescription {
             dumpProperties = new LinkedHashSet<Property>();
 
             for (Property property : properties.values()) {
-                if (!excludes.contains(property.getName()) && property.isReadable()) {
+                if (!(excludeMap.containsKey(property.getName()) && excludeMap.get(property.getName()).equals(property.getType())) && property.isReadable()) {
                     dumpProperties.add(property);
                 }
             }
 
             for (Property property : readableProps) {
-                if (!excludes.contains(property.getName())) {
+                if (!(excludeMap.containsKey(property.getName()) && excludeMap.get(property.getName()).equals(property.getType()))) {
                     dumpProperties.add(property);
                 }
             }

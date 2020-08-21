@@ -45,6 +45,8 @@ public class PropertySubstitute extends Property {
     protected Class<?>[] parameters;
     private Property delegate;
     private boolean filler;
+    private String sourceName;
+    private Class<?> sourceType;
 
     public PropertySubstitute(String name, Class<?> type, String readMethod, String writeMethod,
             Class<?>... params) {
@@ -196,17 +198,24 @@ public class PropertySubstitute extends Property {
         for (Class<?> c = type; c != null; c = c.getSuperclass()) {
             for (Method method : c.getDeclaredMethods()) {
                 if (name.equals(method.getName())) {
-                    Class<?>[] parameterTypes = method.getParameterTypes();
-                    if (parameterTypes.length != params.length) {
-                        continue;
-                    }
+//                    Class<?>[] parameterTypes = method.getParameterTypes();
+//                    if (parameterTypes.length != params.length) {
+//                        continue;
+//                    }
                     boolean found = true;
-                    for (int i = 0; i < parameterTypes.length; i++) {
-                        if (!parameterTypes[i].isAssignableFrom(params[i])) {
-                            found = false;
-                        }
-                    }
+//                    for (int i = 0; i < parameterTypes.length; i++) {
+//                        if (!parameterTypes[i].isAssignableFrom(params[i])) {
+//                            found = false;
+//                        }
+//                    }
                     if (found) {
+                        if (name.startsWith("get")) {
+                            sourceName = name.substring(3).replaceFirst(".", String.valueOf(name.charAt(3)).toLowerCase());
+                            sourceType = method.getReturnType();
+                        } else if (name.startsWith("is")) {
+                            sourceName = name.substring(2).replaceFirst(".", String.valueOf(name.charAt(2)).toLowerCase());
+                            sourceType = method.getReturnType();
+                        }
                         method.setAccessible(true);
                         return method;
                     }
@@ -236,6 +245,14 @@ public class PropertySubstitute extends Property {
             return t;
         }
         return delegate != null ? delegate.getType() : null;
+    }
+
+    public Class<?> getSourceType() {
+        return sourceType;
+    }
+
+    public String getSourceName() {
+        return sourceName;
     }
 
     @Override
