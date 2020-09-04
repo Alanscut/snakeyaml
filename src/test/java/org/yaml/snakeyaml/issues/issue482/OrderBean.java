@@ -16,10 +16,10 @@
 package org.yaml.snakeyaml.issues.issue482;
 
 public class OrderBean {
-    public String userName;
-    public String passWord;
-    public String email;
-    public Blocks address;
+    private String userName;
+    private String passWord;
+    private String email;
+    private Blocks address;
 
     public void setUserName(String userName) {
         this.userName = userName;

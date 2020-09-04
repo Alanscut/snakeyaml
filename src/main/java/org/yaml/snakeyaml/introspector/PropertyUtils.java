@@ -83,6 +83,7 @@ public class PropertyUtils {
                                 properties.put(field.getName(), new FieldProperty(field));
                             } else {
                                 inaccessableFieldsExist = true;
+                                properties.put(field.getName(), null);
                             }
                         }
                     }
@@ -94,12 +95,20 @@ public class PropertyUtils {
                             .getPropertyDescriptors()) {
                         Method readMethod = property.getReadMethod();
                         if ((readMethod == null || !readMethod.getName().equals("getClass"))
-                                && !isTransient(property) && !properties.containsKey(property.getName())) {
+                                && !isTransient(property) && (!properties.containsKey(property.getName()) || properties.get(property.getName()) == null)) {
                             properties.put(property.getName(), new MethodProperty(property));
                         }
                     }
                 } catch (IntrospectionException e) {
                     throw new YAMLException(e);
+                }
+                if (properties.containsValue(null)) {
+                    Iterator<Map.Entry<String, Property>> iterator = properties.entrySet().iterator();
+                    while (iterator.hasNext()) {
+                        if (iterator.next().getValue() == null) {
+                            iterator.remove();
+                        }
+                    }
                 }
                 break;
         }

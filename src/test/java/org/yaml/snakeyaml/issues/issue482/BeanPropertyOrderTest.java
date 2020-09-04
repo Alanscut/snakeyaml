@@ -37,13 +37,10 @@ public class BeanPropertyOrderTest extends TestCase {
         assertEquals(str, yaml.dump(orderBean));
     }
 
-    public void test_private_bean_order() {
-        PropertyUtils propertyUtils = new PropertyUtils();
-        propertyUtils.setKeepBeanPropertyOrder(true);
-        propertyUtils.setBeanAccess(BeanAccess.FIELD);
-        Representer representer = new Representer();
-        representer.setPropertyUtils(propertyUtils);
-        Yaml yaml = new Yaml(representer);
+    public void test_private_public_bean_order() {
+        DumperOptions dumperOptions = new DumperOptions();
+        dumperOptions.setKeepBeanPropertyOrder(true);
+        Yaml yaml = new Yaml(dumperOptions);
         String str = "!!org.yaml.snakeyaml.issues.issue482.OrderBean2\n" +
                 "userName: Bruce\n" +
                 "passWord: '123456'\n" +

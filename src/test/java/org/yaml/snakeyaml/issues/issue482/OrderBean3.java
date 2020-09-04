@@ -19,5 +19,5 @@ public class OrderBean3 {
     public String userName;
     private String passWord;
     public String email;
-    public Blocks address;
+    private Blocks address;
 }

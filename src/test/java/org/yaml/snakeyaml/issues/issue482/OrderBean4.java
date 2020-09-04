@@ -15,9 +15,9 @@
  */
 package org.yaml.snakeyaml.issues.issue482;
 
-public class OrderBean4 extends OrderBean {
+public class OrderBean4 extends OrderBean2 {
     public String name;
-    public Integer account;
+    private Integer account;
 
     public void setName(String name) {
         this.name = name;

@@ -19,7 +19,7 @@ public class OrderBean2 {
     public String userName;
     private String passWord;
     public String email;
-    public Blocks address;
+    private Blocks address;
 
     public void setUserName(String userName) {
         this.userName = userName;
