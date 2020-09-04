@@ -22,12 +22,7 @@ import java.beans.PropertyDescriptor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 
 import org.yaml.snakeyaml.error.YAMLException;
 import org.yaml.snakeyaml.util.PlatformFeatureDetector;
@@ -39,6 +34,7 @@ public class PropertyUtils {
     private BeanAccess beanAccess = BeanAccess.DEFAULT;
     private boolean allowReadOnlyProperties = false;
     private boolean skipMissingProperties = false;
+    private boolean keepBeanPropertyOrder = false;
 
     private PlatformFeatureDetector platformFeatureDetector;
 
@@ -78,20 +74,6 @@ public class PropertyUtils {
                 }
                 break;
             default:
-                // add JavaBean properties
-                try {
-                    for (PropertyDescriptor property : Introspector.getBeanInfo(type)
-                            .getPropertyDescriptors()) {
-                        Method readMethod = property.getReadMethod();
-                        if ((readMethod == null || !readMethod.getName().equals("getClass"))
-                                && !isTransient(property)) {
-                            properties.put(property.getName(), new MethodProperty(property));
-                        }
-                    }
-                } catch (IntrospectionException e) {
-                    throw new YAMLException(e);
-                }
-
                 // add public fields
                 for (Class<?> c = type; c != null; c = c.getSuperclass()) {
                     for (Field field : c.getDeclaredFields()) {
@@ -104,6 +86,20 @@ public class PropertyUtils {
                             }
                         }
                     }
+                }
+
+                // add JavaBean properties
+                try {
+                    for (PropertyDescriptor property : Introspector.getBeanInfo(type)
+                            .getPropertyDescriptors()) {
+                        Method readMethod = property.getReadMethod();
+                        if ((readMethod == null || !readMethod.getName().equals("getClass"))
+                                && !isTransient(property) && !properties.containsKey(property.getName())) {
+                            properties.put(property.getName(), new MethodProperty(property));
+                        }
+                    }
+                } catch (IntrospectionException e) {
+                    throw new YAMLException(e);
                 }
                 break;
         }
@@ -134,7 +130,7 @@ public class PropertyUtils {
     }
 
     protected Set<Property> createPropertySet(Class<? extends Object> type, BeanAccess bAccess) {
-        Set<Property> properties = new TreeSet<Property>();
+        Set<Property> properties = keepBeanPropertyOrder ? new LinkedHashSet<Property>() : new TreeSet<Property>();
         Collection<Property> props = getPropertiesMap(type, bAccess).values();
         for (Property property : props) {
             if (property.isReadable() && (allowReadOnlyProperties || property.isWritable())) {
@@ -201,5 +197,15 @@ public class PropertyUtils {
 
     public boolean isSkipMissingProperties() {
         return skipMissingProperties;
+    }
+
+    public boolean isKeepBeanPropertyOrder() {
+        return keepBeanPropertyOrder;
+    }
+
+    public void setKeepBeanPropertyOrder(boolean keepBeanPropertyOrder) {
+        if (this.keepBeanPropertyOrder != keepBeanPropertyOrder) {
+            this.keepBeanPropertyOrder = keepBeanPropertyOrder;
+        }
     }
 }

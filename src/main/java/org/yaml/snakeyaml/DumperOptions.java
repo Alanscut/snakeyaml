@@ -196,6 +196,7 @@ public class DumperOptions {
     private TimeZone timeZone = null;
     private int maxSimpleKeyLength = 128;
     private NonPrintableStyle  nonPrintableStyle = NonPrintableStyle.BINARY;
+    private boolean keepBeanPropertyOrder = false;
 
     private Version version = null;
     private Map<String, String> tags = null;
@@ -473,5 +474,13 @@ public class DumperOptions {
      */
     public void setNonPrintableStyle(NonPrintableStyle style) {
         this.nonPrintableStyle = style;
+    }
+
+    public boolean isKeepBeanPropertyOrder() {
+        return keepBeanPropertyOrder;
+    }
+
+    public void setKeepBeanPropertyOrder(boolean keepBeanPropertyOrder) {
+        this.keepBeanPropertyOrder = keepBeanPropertyOrder;
     }
 }

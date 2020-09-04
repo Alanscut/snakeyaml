@@ -118,6 +118,7 @@ public class Yaml {
         dumperOptions.setDefaultFlowStyle(representer.getDefaultFlowStyle());
         dumperOptions.setDefaultScalarStyle(representer.getDefaultScalarStyle());
         dumperOptions.setAllowReadOnlyProperties(representer.getPropertyUtils().isAllowReadOnlyProperties());
+        dumperOptions.setKeepBeanPropertyOrder(representer.getPropertyUtils().isKeepBeanPropertyOrder());
         dumperOptions.setTimeZone(representer.getTimeZone());
         return dumperOptions;
     }
@@ -200,6 +201,8 @@ public class Yaml {
         representer.setDefaultScalarStyle(dumperOptions.getDefaultScalarStyle());
         representer.getPropertyUtils()
                 .setAllowReadOnlyProperties(dumperOptions.isAllowReadOnlyProperties());
+        representer.getPropertyUtils()
+                .setKeepBeanPropertyOrder(dumperOptions.isKeepBeanPropertyOrder());
         representer.setTimeZone(dumperOptions.getTimeZone());
         this.representer = representer;
         this.dumperOptions = dumperOptions;
