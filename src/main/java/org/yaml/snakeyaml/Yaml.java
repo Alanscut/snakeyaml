@@ -64,8 +64,7 @@ public class Yaml {
      * Create Yaml instance.
      */
     public Yaml() {
-        this(new Constructor(), new Representer(), new DumperOptions(), new LoaderOptions(),
-                new Resolver());
+        this(new Constructor(), new Representer(), new DumperOptions(), new LoaderOptions(), new Resolver());
     }
 
     /**
@@ -131,7 +130,8 @@ public class Yaml {
      * @param dumperOptions DumperOptions to configure outgoing objects
      */
     public Yaml(Representer representer, DumperOptions dumperOptions) {
-        this(new Constructor(), representer, dumperOptions, new LoaderOptions(), new Resolver());
+        this(new Constructor(), representer, dumperOptions, new LoaderOptions(),
+                new Resolver());
     }
 
     /**
@@ -178,14 +178,14 @@ public class Yaml {
      * Create Yaml instance. It is safe to create a few instances and use them
      * in different Threads.
      *
-     * @param constructor   BaseConstructor to construct incoming documents
-     * @param representer   Representer to emit outgoing objects
-     * @param dumperOptions DumperOptions to configure outgoing objects
-     * @param loadingConfig LoadingConfig to control load behavior
-     * @param resolver      Resolver to detect implicit type
+     * @param constructor           BaseConstructor to construct incoming documents
+     * @param representer           Representer to emit outgoing objects
+     * @param dumperOptions         DumperOptions to configure outgoing objects
+     * @param loadingConfig         LoadingConfig to control load behavior
+     * @param resolver              Resolver to detect implicit type
      */
     public Yaml(BaseConstructor constructor, Representer representer, DumperOptions dumperOptions,
-                LoaderOptions loadingConfig, Resolver resolver) {
+                LoaderOptions loadingConfig,  Resolver resolver) {
         if (!constructor.isExplicitPropertyUtils()) {
             constructor.setPropertyUtils(representer.getPropertyUtils());
         } else if (!representer.isExplicitPropertyUtils()) {
@@ -354,6 +354,24 @@ public class Yaml {
     }
 
     /**
+     * Serialize (dump) a YAML node into a YAML stream.
+     *
+     * @param node   YAML node to be serialized to YAML
+     * @param output stream to write to
+     */
+    public void serialize(Node node, Writer output) {
+        Serializer serializer = new Serializer(new Emitter(output, dumperOptions), resolver,
+                dumperOptions, null);
+        try {
+            serializer.open();
+            serializer.serialize(node);
+            serializer.close();
+        } catch (IOException e) {
+            throw new YAMLException(e);
+        }
+    }
+
+    /**
      * Serialize the representation tree into Events.
      *
      * @param data representation tree
@@ -476,7 +494,8 @@ public class Yaml {
     }
 
     private <T> T loadFromReader(StreamReader sreader, Type type) {
-        Composer composer = new Composer(new ParserImpl(sreader), resolver, loadingConfig);
+        Composer composer = new Composer(new ParserImpl(sreader,
+                loadingConfig.isProcessComments()), resolver, loadingConfig);
         constructor.setComposer(composer);
         return constructor.getSingleData(type);
     }
@@ -490,7 +509,8 @@ public class Yaml {
      * sequence
      */
     public Iterable<Object> loadAll(Reader yaml) {
-        Composer composer = new Composer(new ParserImpl(new StreamReader(yaml)), resolver, loadingConfig);
+        Composer composer = new Composer(new ParserImpl(new StreamReader(yaml),
+                loadingConfig.isProcessComments()), resolver, loadingConfig);
         constructor.setComposer(composer);
         Iterator<Object> result = new Iterator<Object>() {
             @Override
@@ -559,7 +579,8 @@ public class Yaml {
      * Overview</a>
      */
     public Node compose(Reader yaml) {
-        Composer composer = new Composer(new ParserImpl(new StreamReader(yaml)), resolver, loadingConfig);
+        Composer composer = new Composer(new ParserImpl(new StreamReader(yaml),
+                loadingConfig.isProcessComments()), resolver, loadingConfig);
         return composer.getSingleNode();
     }
 
@@ -572,7 +593,8 @@ public class Yaml {
      * @see <a href="http://yaml.org/spec/1.1/#id859333">Processing Overview</a>
      */
     public Iterable<Node> composeAll(Reader yaml) {
-        final Composer composer = new Composer(new ParserImpl(new StreamReader(yaml)), resolver, loadingConfig);
+        final Composer composer = new Composer(new ParserImpl(new StreamReader(yaml),
+                loadingConfig.isProcessComments()), resolver, loadingConfig);
         Iterator<Node> result = new Iterator<Node>() {
             @Override
             public boolean hasNext() {
@@ -656,7 +678,8 @@ public class Yaml {
      * @see <a href="http://yaml.org/spec/1.1/#id859333">Processing Overview</a>
      */
     public Iterable<Event> parse(Reader yaml) {
-        final Parser parser = new ParserImpl(new StreamReader(yaml));
+        final Parser parser = new ParserImpl(new StreamReader(yaml),
+                loadingConfig.isProcessComments());
         Iterator<Event> result = new Iterator<Event>() {
             @Override
             public boolean hasNext() {

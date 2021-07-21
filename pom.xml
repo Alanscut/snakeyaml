@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.yaml</groupId>
     <artifactId>snakeyaml</artifactId>
-    <version>1.27-SNAPSHOT</version>
+    <version>1.30-SNAPSHOT</version>
     <packaging>bundle</packaging>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -14,6 +14,7 @@
         <maven.compiler.target>7</maven.compiler.target>
         <maven.javadoc.failOnError>false</maven.javadoc.failOnError>
         <maven-bundle-plugin.version>3.5.0</maven-bundle-plugin.version>
+        <maven-resources-plugin.version>3.0.2</maven-resources-plugin.version><!-- for Github CI -->
         <cobertura-maven-plugin.version>2.7</cobertura-maven-plugin.version>
         <maven-site-plugin.version>3.7.1</maven-site-plugin.version>
         <maven-surefire-plugin.version>3.0.0-M1</maven-surefire-plugin.version>
@@ -27,10 +28,6 @@
         <system>Bitbucket</system>
         <url>https://bitbucket.org/asomov/snakeyaml/issues</url>
     </issueManagement>
-    <!-- ciManagement>
-        <system>jenkins</system>
-        <url>https://snakeyaml.ci.cloudbees.com/job/SnakeYAML/</url>
-    </ciManagement-->
     <mailingLists>
         <mailingList>
             <name>SnakeYAML developers and users List</name>
@@ -38,8 +35,8 @@
         </mailingList>
     </mailingLists>
     <scm>
-        <connection>scm:hg:http://bitbucket.org/asomov/snakeyaml</connection>
-        <developerConnection>scm:hg:ssh://hg@bitbucket.org/asomov/snakeyaml</developerConnection>
+        <connection>scm:git:http://bitbucket.org/asomov/snakeyaml</connection>
+        <developerConnection>scm:git:ssh://git@bitbucket.org/asomov/snakeyaml</developerConnection>
         <url>https://bitbucket.org/asomov/snakeyaml/src</url>
         <tag>HEAD</tag>
     </scm>
@@ -71,19 +68,7 @@
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
-            <version>4.12</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-lang3</artifactId>
-            <version>3.4</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>commons-io</groupId>
-            <artifactId>commons-io</artifactId>
-            <version>2.5</version>
+            <version>4.13.1</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -121,6 +106,11 @@
         </testResources>
         <pluginManagement>
             <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-resources-plugin</artifactId>
+                    <version>${maven-resources-plugin.version}</version>
+                </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-javadoc-plugin</artifactId>
@@ -650,7 +640,7 @@
                 <plugins>
                     <plugin>
                         <artifactId>maven-resources-plugin</artifactId>
-                        <version>3.0.2</version>
+                        <version>${maven-resources-plugin.version}</version>
                         <executions>
                             <execution>
                                 <id>copy-src-for-android</id>
@@ -753,7 +743,7 @@
                                         <javac srcdir="${android.src.main}" destdir="${android.classes}" classpath="${android.classes}" encoding="${project.build.sourceEncoding}" target="1.7" source="1.7" debug="true" includeantruntime="true" fork="true" />
 
                                         <!-- compile test classes. Exclude some - not for BeanAccess.FIELD -->
-                                        <javac srcdir="${android.src.test}:${basedir}/src/test/resources" destdir="${android.test.classes}" classpath="${android.classes}:${android.test.classes}:${junit:junit:jar}:${org.springframework:spring-core:jar}:${org.springframework:spring-beans:jar}:${org.springframework:spring-context:jar}:${org.apache.velocity:velocity:jar}:${joda-time:joda-time:jar}:${commons-io:commons-io:jar}:${commons-lang:commons-lang:jar}:${org.hamcrest:hamcrest-core:jar}" encoding="${project.build.sourceEncoding}" target="1.7" source="1.7" debug="true" includeantruntime="true" fork="true">
+                                        <javac srcdir="${android.src.test}:${basedir}/src/test/resources" destdir="${android.test.classes}" classpath="${android.classes}:${android.test.classes}:${junit:junit:jar}:${org.apache.velocity:velocity:jar}:${joda-time:joda-time:jar}:${commons-io:commons-io:jar}:${commons-lang:commons-lang:jar}:${org.hamcrest:hamcrest-core:jar}" encoding="${project.build.sourceEncoding}" target="1.7" source="1.7" debug="true" includeantruntime="true" fork="true">
 
                                             <exclude name="org/yaml/snakeyaml/introspector/MethodPropertyTest.java" />
                                             <exclude name="org/yaml/snakeyaml/representer/FilterPropertyToDumpTest.java" />

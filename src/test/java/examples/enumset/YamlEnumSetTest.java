@@ -19,8 +19,10 @@ import java.util.EnumSet;
 
 import org.junit.Assert;
 import org.junit.Test;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.TypeDescription;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.error.YAMLException;
 import org.yaml.snakeyaml.nodes.Node;
 
 public class YamlEnumSetTest {
@@ -80,8 +82,45 @@ public class YamlEnumSetTest {
         Assert.assertEquals(yEST.setOfDays, loaded.setOfDays);
     }
 
-    private Yaml createYaml() {
-        Yaml yaml = new Yaml();
+    @Test
+    public void enumSetLoadWithoutCaseSensitive() {
+        //given
+        LoaderOptions loaderOptions = new LoaderOptions();
+        loaderOptions.setEnumCaseSensitive(false);
+
+        YamlEnumSetTest yEST = new YamlEnumSetTest();
+        yEST.day = Day.SUNDAY;
+        yEST.setOfDays = EnumSet.of(Day.MONDAY, Day.WEDNESDAY, Day.FRIDAY);
+
+        String yamlStr = "day: SUNDAY\nsetOfDays: { MONDAY, wednesday, friDay }\n";
+
+        //when
+        YamlEnumSetTest loaded = createYaml(loaderOptions).loadAs(yamlStr, YamlEnumSetTest.class);
+
+        //then
+        Assert.assertTrue(loaded.day == Day.SUNDAY);
+
+        Object[] expected = yEST.setOfDays.toArray();
+        Object[] actual = loaded.setOfDays.toArray();
+
+        Assert.assertArrayEquals(expected, actual);
+        Assert.assertEquals(yEST.setOfDays, loaded.setOfDays);
+    }
+
+    @Test(expected = YAMLException.class)
+    public void enumSetLoadWithCaseSensitive() {
+        YamlEnumSetTest yEST = new YamlEnumSetTest();
+        yEST.day = Day.SUNDAY;
+        yEST.setOfDays = EnumSet.of(Day.MONDAY, Day.WEDNESDAY, Day.FRIDAY);
+
+        String yamlStr = "day: SUNDAY\nsetOfDays: { MONDAY, wednesday, friDay }\n";
+
+        //when
+        createYaml().loadAs(yamlStr, YamlEnumSetTest.class);
+    }
+
+    private Yaml createYaml(LoaderOptions loaderOptions) {
+        Yaml yaml = loaderOptions != null ? new Yaml(loaderOptions) : new Yaml();
 
         TypeDescription yamlEnumSetTD = new TypeDescription(YamlEnumSetTest.class) {
 
@@ -99,5 +138,11 @@ public class YamlEnumSetTest {
 
         return yaml;
     }
+
+    private Yaml createYaml() {
+        return createYaml(null);
+    }
+
+
 
 }

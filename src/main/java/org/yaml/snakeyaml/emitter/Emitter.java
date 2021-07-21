@@ -16,14 +16,20 @@
 package org.yaml.snakeyaml.emitter;
 
 import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.DumperOptions.ScalarStyle;
 import org.yaml.snakeyaml.DumperOptions.Version;
+import org.yaml.snakeyaml.comments.CommentEventsCollector;
+import org.yaml.snakeyaml.comments.CommentLine;
+import org.yaml.snakeyaml.comments.CommentType;
 import org.yaml.snakeyaml.error.YAMLException;
 import org.yaml.snakeyaml.events.AliasEvent;
 import org.yaml.snakeyaml.events.CollectionEndEvent;
 import org.yaml.snakeyaml.events.CollectionStartEvent;
+import org.yaml.snakeyaml.events.CommentEvent;
 import org.yaml.snakeyaml.events.DocumentEndEvent;
 import org.yaml.snakeyaml.events.DocumentStartEvent;
 import org.yaml.snakeyaml.events.Event;
+import org.yaml.snakeyaml.events.Event.ID;
 import org.yaml.snakeyaml.events.MappingEndEvent;
 import org.yaml.snakeyaml.events.MappingStartEvent;
 import org.yaml.snakeyaml.events.NodeEvent;
@@ -43,6 +49,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
@@ -105,7 +112,7 @@ public final class Emitter implements Emitable {
     // The stream should have the methods `write` and possibly `flush`.
     private final Writer stream;
 
-    // Encoding is defined by Writer (cannot be overriden by STREAM-START.)
+    // Encoding is defined by Writer (cannot be overridden by STREAM-START.)
     // private Charset encoding;
 
     // Emitter is a state machine with a stack of states to handle nested
@@ -154,6 +161,7 @@ public final class Emitter implements Emitable {
     private final char[] bestLineBreak;
     private final boolean splitLines;
     private final int maxSimpleKeyLength;
+    private final boolean emitComments;
 
     // Tag prefixes.
     private Map<String, String> tagPrefixes;
@@ -165,6 +173,11 @@ public final class Emitter implements Emitable {
     // Scalar analysis and style.
     private ScalarAnalysis analysis;
     private DumperOptions.ScalarStyle style;
+    
+    // Comment processing
+    private final CommentEventsCollector blockCommentsCollector;
+    private final CommentEventsCollector inlineCommentsCollector;
+
 
     public Emitter(Writer stream, DumperOptions opts) {
         // The stream should have the methods `write` and possibly `flush`.
@@ -215,6 +228,7 @@ public final class Emitter implements Emitable {
         this.bestLineBreak = opts.getLineBreak().getString().toCharArray();
         this.splitLines = opts.getSplitLines();
         this.maxSimpleKeyLength = opts.getMaxSimpleKeyLength();
+        this.emitComments = opts.isProcessComments();
 
         // Tag prefixes.
         this.tagPrefixes = new LinkedHashMap<String, String>();
@@ -226,6 +240,12 @@ public final class Emitter implements Emitable {
         // Scalar analysis and style.
         this.analysis = null;
         this.style = null;
+        
+        // Comment processing
+        this.blockCommentsCollector = new CommentEventsCollector(events,
+                CommentType.BLANK_LINE, CommentType.BLOCK);
+        this.inlineCommentsCollector = new CommentEventsCollector(events,
+                CommentType.IN_LINE);
     }
 
     public void emit(Event event) throws IOException {
@@ -243,24 +263,41 @@ public final class Emitter implements Emitable {
         if (events.isEmpty()) {
             return true;
         }
-        Event event = events.peek();
-        if (event instanceof DocumentStartEvent) {
-            return needEvents(1);
-        } else if (event instanceof SequenceStartEvent) {
-            return needEvents(2);
-        } else if (event instanceof MappingStartEvent) {
-            return needEvents(3);
-        } else {
-            return false;
-        }
-    }
 
-    private boolean needEvents(int count) {
-        int level = 0;
         Iterator<Event> iter = events.iterator();
-        iter.next();
+        Event event = iter.next();
+        while(event instanceof CommentEvent) {
+            if (!iter.hasNext()) {
+                return true;
+            }
+            event = iter.next();
+        }
+
+        if (event instanceof DocumentStartEvent) {
+            return needEvents(iter, 1);
+        } else if (event instanceof SequenceStartEvent) {
+            return needEvents(iter, 2);
+        } else if (event instanceof MappingStartEvent) {
+            return needEvents(iter, 3);
+        } else if (event instanceof StreamStartEvent) {
+            return needEvents(iter, 2);
+        } else if (event instanceof StreamEndEvent) {
+            return false;
+        } else if (emitComments) {
+            return needEvents(iter, 1);
+        }
+        return false;
+    }
+    
+    private boolean needEvents(Iterator<Event> iter, int count) {
+        int level = 0;
+        int actualCount = 0;
         while (iter.hasNext()) {
             Event event = iter.next();
+            if (event instanceof CommentEvent) {
+                continue;
+            }
+            actualCount++;
             if (event instanceof DocumentStartEvent || event instanceof CollectionStartEvent) {
                 level++;
             } else if (event instanceof DocumentEndEvent || event instanceof CollectionEndEvent) {
@@ -272,7 +309,7 @@ public final class Emitter implements Emitable {
                 return false;
             }
         }
-        return events.size() < count + 1;
+        return actualCount < count;
     }
 
     private void increaseIndent(boolean flow, boolean indentless) {
@@ -366,6 +403,10 @@ public final class Emitter implements Emitable {
                 // }
                 writeStreamEnd();
                 state = new ExpectNothing();
+            } else if (event instanceof CommentEvent) {
+                blockCommentsCollector.collectEvents(event);
+                writeBlockComment();
+                // state = state; remains unchanged
             } else {
                 throw new EmitterException("expected DocumentStartEvent, but got " + event);
             }
@@ -374,6 +415,8 @@ public final class Emitter implements Emitable {
 
     private class ExpectDocumentEnd implements EmitterState {
         public void expect() throws IOException {
+            event = blockCommentsCollector.collectEventsAndPoll(event);
+            writeBlockComment();
             if (event instanceof DocumentEndEvent) {
                 writeIndent();
                 if (((DocumentEndEvent) event).getExplicit()) {
@@ -390,6 +433,14 @@ public final class Emitter implements Emitable {
 
     private class ExpectDocumentRoot implements EmitterState {
         public void expect() throws IOException {
+            event = blockCommentsCollector.collectEventsAndPoll(event);
+            if (!blockCommentsCollector.isEmpty()) {
+                writeBlockComment();
+                if (event instanceof DocumentEndEvent) {
+                    new ExpectDocumentEnd().expect();
+                    return;
+                }
+            }
             states.push(new ExpectDocumentEnd());
             expectNode(true, false, false);
         }
@@ -461,13 +512,20 @@ public final class Emitter implements Emitable {
                 indent = indents.pop();
                 flowLevel--;
                 writeIndicator("]", false, false, false);
+                inlineCommentsCollector.collectEvents();
+                writeInlineComments();
                 state = states.pop();
+            } else if (event instanceof CommentEvent) {
+                blockCommentsCollector.collectEvents(event);
+                writeBlockComment();
             } else {
                 if (canonical || (column > bestWidth && splitLines) || prettyFlow) {
                     writeIndent();
                 }
                 states.push(new ExpectFlowSequenceItem());
                 expectNode(false, false, false);
+                event = inlineCommentsCollector.collectEvents(event);
+                writeInlineComments();
             }
         }
     }
@@ -482,10 +540,15 @@ public final class Emitter implements Emitable {
                     writeIndent();
                 }
                 writeIndicator("]", false, false, false);
+                inlineCommentsCollector.collectEvents();
+                writeInlineComments();
                 if (prettyFlow) {
                     writeIndent();
                 }
                 state = states.pop();
+            } else if (event instanceof CommentEvent) {
+                blockCommentsCollector.collectEvents(event);
+                writeBlockComment();
             } else {
                 writeIndicator(",", false, false, false);
                 if (canonical || (column > bestWidth && splitLines) || prettyFlow) {
@@ -493,6 +556,8 @@ public final class Emitter implements Emitable {
                 }
                 states.push(new ExpectFlowSequenceItem());
                 expectNode(false, false, false);
+                inlineCommentsCollector.collectEvents(event);
+                writeInlineComments();
             }
         }
     }
@@ -515,6 +580,8 @@ public final class Emitter implements Emitable {
                 indent = indents.pop();
                 flowLevel--;
                 writeIndicator("}", false, false, false);
+                inlineCommentsCollector.collectEvents();
+                writeInlineComments();
                 state = states.pop();
             } else {
                 if (canonical || (column > bestWidth && splitLines) || prettyFlow) {
@@ -545,6 +612,8 @@ public final class Emitter implements Emitable {
                     writeIndent();
                 }
                 writeIndicator("}", false, false, false);
+                inlineCommentsCollector.collectEvents();
+                writeInlineComments();
                 state = states.pop();
             } else {
                 writeIndicator(",", false, false, false);
@@ -566,8 +635,12 @@ public final class Emitter implements Emitable {
     private class ExpectFlowMappingSimpleValue implements EmitterState {
         public void expect() throws IOException {
             writeIndicator(":", false, false, false);
+            event = inlineCommentsCollector.collectEventsAndPoll(event);
+            writeInlineComments();
             states.push(new ExpectFlowMappingKey());
             expectNode(false, true, false);
+            inlineCommentsCollector.collectEvents(event);
+            writeInlineComments();
         }
     }
 
@@ -577,8 +650,12 @@ public final class Emitter implements Emitable {
                 writeIndent();
             }
             writeIndicator(":", true, false, false);
+            event = inlineCommentsCollector.collectEventsAndPoll(event);
+            writeInlineComments();
             states.push(new ExpectFlowMappingKey());
             expectNode(false, true, false);
+            inlineCommentsCollector.collectEvents(event);
+            writeInlineComments();
         }
     }
 
@@ -607,6 +684,8 @@ public final class Emitter implements Emitable {
             if (!this.first && event instanceof SequenceEndEvent) {
                 indent = indents.pop();
                 state = states.pop();
+            } else if( event instanceof CommentEvent) {
+                blockCommentsCollector.collectEvents(event);
             } else {
                 writeIndent();
                 if (!indentWithIndicator || this.first) {
@@ -616,8 +695,21 @@ public final class Emitter implements Emitable {
                 if (indentWithIndicator && this.first) {
                     indent += indicatorIndent;
                 }
+                if (!blockCommentsCollector.isEmpty()) {
+                    increaseIndent(false, false);
+                    writeBlockComment();
+                    if(event instanceof ScalarEvent) {
+                        analysis = analyzeScalar(((ScalarEvent)event).getValue());
+                        if (!analysis.isEmpty()) {
+                            writeIndent();
+                        }
+                    }
+                    indent = indents.pop();
+                }
                 states.push(new ExpectBlockSequenceItem(false));
                 expectNode(false, false, false);
+                inlineCommentsCollector.collectEvents();
+                writeInlineComments();
             }
         }
     }
@@ -642,6 +734,8 @@ public final class Emitter implements Emitable {
         }
 
         public void expect() throws IOException {
+            event = blockCommentsCollector.collectEventsAndPoll(event);
+            writeBlockComment();
             if (!this.first && event instanceof MappingEndEvent) {
                 indent = indents.pop();
                 state = states.pop();
@@ -659,11 +753,37 @@ public final class Emitter implements Emitable {
         }
     }
 
+    private boolean isFoldedOrLiteral(Event event) {
+        if(!event.is(ID.Scalar)) {
+            return false;
+        }
+        ScalarEvent scalarEvent = (ScalarEvent) event;
+        ScalarStyle style = scalarEvent.getScalarStyle();
+        return style == ScalarStyle.FOLDED || style == ScalarStyle.LITERAL;
+    }
+    
     private class ExpectBlockMappingSimpleValue implements EmitterState {
         public void expect() throws IOException {
             writeIndicator(":", false, false, false);
+            event = inlineCommentsCollector.collectEventsAndPoll(event);
+            if(!isFoldedOrLiteral(event)) {
+                if(writeInlineComments()) {
+                    increaseIndent(true, false);
+                    writeIndent();
+                    indent = indents.pop();
+                }
+            }
+            event = blockCommentsCollector.collectEventsAndPoll(event);
+            if(!blockCommentsCollector.isEmpty()) {
+                increaseIndent(true, false);
+                writeBlockComment();
+                writeIndent();
+                indent = indents.pop();
+            }
             states.push(new ExpectBlockMappingKey(false));
             expectNode(false, true, false);
+            inlineCommentsCollector.collectEvents();
+            writeInlineComments();
         }
     }
 
@@ -671,8 +791,14 @@ public final class Emitter implements Emitable {
         public void expect() throws IOException {
             writeIndent();
             writeIndicator(":", true, false, true);
+            event = inlineCommentsCollector.collectEventsAndPoll(event);
+            writeInlineComments();
+            event = blockCommentsCollector.collectEventsAndPoll(event);
+            writeBlockComment();
             states.push(new ExpectBlockMappingKey(false));
             expectNode(false, true, false);
+            inlineCommentsCollector.collectEvents(event);
+            writeInlineComments();
         }
     }
 
@@ -1316,6 +1442,44 @@ public final class Emitter implements Emitable {
         }
         writeIndicator("\"", false, false, false);
     }
+    
+    private boolean writeCommentLines(List<CommentLine> commentLines) throws IOException {
+        boolean wroteComment = false;
+        if(emitComments) {
+            int indentColumns = 0;
+            boolean firstComment = true;
+            for (CommentLine commentLine : commentLines) {
+                if (commentLine.getCommentType() != CommentType.BLANK_LINE) {
+                    if (firstComment) {
+                        firstComment = false;
+                        writeIndicator("#", commentLine.getCommentType() == CommentType.IN_LINE, false, false);
+                        indentColumns = this.column > 0 ? this.column - 1 : 0;
+                    } else {
+                        writeWhitespace(indentColumns);
+                        writeIndicator("#", false, false, false);
+                    }
+                    stream.write(commentLine.getValue());
+                    writeLineBreak(null);
+                } else {
+                    writeLineBreak(null);
+                    writeIndent();
+                }
+                wroteComment = true;
+            }
+        }
+        return wroteComment;
+    }
+    
+    private void writeBlockComment() throws IOException {
+        if(!blockCommentsCollector.isEmpty()) {
+            writeIndent();
+            writeCommentLines(blockCommentsCollector.consume());
+        }
+    }
+
+    private boolean writeInlineComments() throws IOException {
+        return writeCommentLines(inlineCommentsCollector.consume());
+    }
 
     private String determineBlockHints(String text) {
         StringBuilder hints = new StringBuilder();
@@ -1337,7 +1501,9 @@ public final class Emitter implements Emitable {
         if (hints.length() > 0 && (hints.charAt(hints.length() - 1) == '+')) {
             openEnded = true;
         }
-        writeLineBreak(null);
+        if(!writeInlineComments()) {
+            writeLineBreak(null);
+        }
         boolean leadingSpace = true;
         boolean spaces = false;
         boolean breaks = true;
@@ -1402,7 +1568,9 @@ public final class Emitter implements Emitable {
         if (hints.length() > 0 && (hints.charAt(hints.length() - 1)) == '+') {
             openEnded = true;
         }
-        writeLineBreak(null);
+        if(!writeInlineComments()) {
+            writeLineBreak(null);
+        }
         boolean breaks = true;
         int start = 0, end = 0;
         while (end <= text.length()) {

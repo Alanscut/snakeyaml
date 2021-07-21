@@ -38,6 +38,7 @@ import org.yaml.snakeyaml.nodes.NodeTuple;
 import org.yaml.snakeyaml.nodes.ScalarNode;
 import org.yaml.snakeyaml.nodes.SequenceNode;
 import org.yaml.snakeyaml.nodes.Tag;
+import org.yaml.snakeyaml.util.EnumUtils;
 
 /**
  * Construct a custom Java instance.
@@ -260,10 +261,10 @@ public class Constructor extends SafeConstructor {
                                 mnode.setUseClassConstructor(true);
                                 mnode.setGenType(genType);
                             } else if (Map.class.isAssignableFrom(valueNode.getType())) {
-                                Class<?> ketType = arguments[0];
+                                Class<?> keyType = arguments[0];
                                 Class<?> valueType = arguments[1];
                                 MappingNode mnode = (MappingNode) valueNode;
-                                mnode.setTypes(ketType, valueType);
+                                mnode.setTypes(keyType, valueType);
                                 mnode.setUseClassConstructor(true);
                                 mnode.setGenType(genType);
                             }
@@ -497,7 +498,11 @@ public class Constructor extends SafeConstructor {
             } else if (Enum.class.isAssignableFrom(type)) {
                 String enumValueName = node.getValue();
                 try {
-                    result = Enum.valueOf(type, enumValueName);
+                    if(loadingConfig.isEnumCaseSensitive()) {
+                        result = Enum.valueOf(type, enumValueName);
+                    } else {
+                        result = EnumUtils.findEnumInsensitiveCase(type, enumValueName);
+                    }
                 } catch (Exception ex) {
                     throw new YAMLException("Unable to find enum value '" + enumValueName
                             + "' for enum class: " + type.getName());

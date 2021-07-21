@@ -16,13 +16,18 @@
 package org.yaml.snakeyaml.composer;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.yaml.snakeyaml.DumperOptions.FlowStyle;
 import org.yaml.snakeyaml.LoaderOptions;
+import org.yaml.snakeyaml.comments.CommentEventsCollector;
+import org.yaml.snakeyaml.comments.CommentLine;
+import org.yaml.snakeyaml.comments.CommentType;
 import org.yaml.snakeyaml.error.Mark;
 import org.yaml.snakeyaml.error.YAMLException;
 import org.yaml.snakeyaml.events.AliasEvent;
@@ -55,6 +60,8 @@ public class Composer {
     private final Set<Node> recursiveNodes;
     private int nonScalarAliasesCount = 0;
     private final LoaderOptions loadingConfig;
+    private final CommentEventsCollector blockCommentsCollector;
+    private final CommentEventsCollector inlineCommentsCollector;
 
     public Composer(Parser parser, Resolver resolver) {
         this(parser, resolver, new LoaderOptions());
@@ -66,6 +73,10 @@ public class Composer {
         this.anchors = new HashMap<String, Node>();
         this.recursiveNodes = new HashSet<Node>();
         this.loadingConfig = loadingConfig;
+        this.blockCommentsCollector = new CommentEventsCollector(parser,
+                CommentType.BLANK_LINE, CommentType.BLOCK);
+        this.inlineCommentsCollector = new CommentEventsCollector(parser,
+                CommentType.IN_LINE);
     }
 
     /**
@@ -85,17 +96,29 @@ public class Composer {
     /**
      * Reads and composes the next document.
      *
-     * @return The root node of the document or <code>null</code> if no more
-     * documents are available.
+     * @return The root node of the document or <code>null</code> if no more documents are available.
      */
     public Node getNode() {
+        // Collect inter-document start comments
+        blockCommentsCollector.collectEvents();
+        if (parser.checkEvent(Event.ID.StreamEnd)) {
+            List<CommentLine> commentLines = blockCommentsCollector.consume();
+            Mark startMark = commentLines.get(0).getStartMark();
+            List<NodeTuple> children = Collections.emptyList();
+            Node node = new MappingNode(Tag.COMMENT, false, children, startMark, null, FlowStyle.BLOCK);
+            node.setBlockComments(commentLines);
+            return node;
+        }
         // Drop the DOCUMENT-START event.
         parser.getEvent();
         // Compose the root node.
         Node node = composeNode(null);
         // Drop the DOCUMENT-END event.
+        blockCommentsCollector.collectEvents();
+        if(!blockCommentsCollector.isEmpty()) {
+            node.setEndComments(blockCommentsCollector.consume());
+        }
         parser.getEvent();
-        //clean up resources
         this.anchors.clear();
         this.recursiveNodes.clear();
         return node;
@@ -131,7 +154,9 @@ public class Composer {
     }
 
     private Node composeNode(Node parent) {
-        if (parent != null) recursiveNodes.add(parent);
+        blockCommentsCollector.collectEvents();
+        if (parent != null)
+            recursiveNodes.add(parent);
         final Node node;
         if (parser.checkEvent(Event.ID.Alias)) {
             AliasEvent event = (AliasEvent) parser.getEvent();
@@ -150,12 +175,13 @@ public class Composer {
             if (recursiveNodes.remove(node)) {
                 node.setTwoStepsConstruction(true);
             }
+            node.setBlockComments(blockCommentsCollector.consume());
         } else {
             NodeEvent event = (NodeEvent) parser.peekEvent();
             String anchor = event.getAnchor();
             // the check for duplicate anchors has been removed (issue 174)
             if (parser.checkEvent(Event.ID.Scalar)) {
-                node = composeScalarNode(anchor);
+                node = composeScalarNode(anchor, blockCommentsCollector.consume());
             } else if (parser.checkEvent(Event.ID.SequenceStart)) {
                 node = composeSequenceNode(anchor);
             } else {
@@ -166,7 +192,7 @@ public class Composer {
         return node;
     }
 
-    protected Node composeScalarNode(String anchor) {
+    protected Node composeScalarNode(String anchor, List<CommentLine> blockComments) {
         ScalarEvent ev = (ScalarEvent) parser.getEvent();
         String tag = ev.getTag();
         boolean resolved = false;
@@ -184,6 +210,8 @@ public class Composer {
             node.setAnchor(anchor);
             anchors.put(anchor, node);
         }
+        node.setBlockComments(blockComments);
+        node.setInLineComments(inlineCommentsCollector.collectEvents().consume());
         return node;
     }
 
@@ -191,6 +219,7 @@ public class Composer {
         SequenceStartEvent startEvent = (SequenceStartEvent) parser.getEvent();
         String tag = startEvent.getTag();
         Tag nodeTag;
+        
         boolean resolved = false;
         if (tag == null || tag.equals("!")) {
             nodeTag = resolver.resolve(NodeId.sequence, null, startEvent.getImplicit());
@@ -201,15 +230,29 @@ public class Composer {
         final ArrayList<Node> children = new ArrayList<Node>();
         SequenceNode node = new SequenceNode(nodeTag, resolved, children, startEvent.getStartMark(),
                 null, startEvent.getFlowStyle());
+        if (startEvent.isFlow()) {
+            node.setBlockComments(blockCommentsCollector.consume());
+        }
         if (anchor != null) {
             node.setAnchor(anchor);
             anchors.put(anchor, node);
         }
         while (!parser.checkEvent(Event.ID.SequenceEnd)) {
+            blockCommentsCollector.collectEvents();
+            if (parser.checkEvent(Event.ID.SequenceEnd)) {
+                break;
+            }
             children.add(composeNode(node));
+        }
+        if (startEvent.isFlow()) {
+            node.setInLineComments(inlineCommentsCollector.collectEvents().consume());
         }
         Event endEvent = parser.getEvent();
         node.setEndMark(endEvent.getEndMark());
+        inlineCommentsCollector.collectEvents();
+        if(!inlineCommentsCollector.isEmpty()) {
+            node.setInLineComments(inlineCommentsCollector.consume());
+        }
         return node;
     }
 
@@ -228,15 +271,29 @@ public class Composer {
         final List<NodeTuple> children = new ArrayList<NodeTuple>();
         MappingNode node = new MappingNode(nodeTag, resolved, children, startEvent.getStartMark(),
                 null, startEvent.getFlowStyle());
+        if (startEvent.isFlow()) {
+            node.setBlockComments(blockCommentsCollector.consume());
+        }
         if (anchor != null) {
             node.setAnchor(anchor);
             anchors.put(anchor, node);
         }
         while (!parser.checkEvent(Event.ID.MappingEnd)) {
+            blockCommentsCollector.collectEvents();
+            if (parser.checkEvent(Event.ID.MappingEnd)) {
+                break;
+            }
             composeMappingChildren(children, node);
+        }
+        if (startEvent.isFlow()) {
+            node.setInLineComments(inlineCommentsCollector.collectEvents().consume());
         }
         Event endEvent = parser.getEvent();
         node.setEndMark(endEvent.getEndMark());
+        inlineCommentsCollector.collectEvents();
+        if(!inlineCommentsCollector.isEmpty()) {
+            node.setInLineComments(inlineCommentsCollector.consume());
+        }
         return node;
     }
 

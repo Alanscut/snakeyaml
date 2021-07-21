@@ -21,6 +21,8 @@ public class LoaderOptions {
     private boolean wrappedToRootException = false;
     private int maxAliasesForCollections = 50; //to prevent YAML at https://en.wikipedia.org/wiki/Billion_laughs_attack
     private boolean allowRecursiveKeys = false;
+    private boolean processComments = false;
+    private boolean enumCaseSensitive = true;
 
     public boolean isAllowDuplicateKeys() {
         return allowDuplicateKeys;
@@ -64,6 +66,10 @@ public class LoaderOptions {
         return maxAliasesForCollections;
     }
 
+    /**
+     * Restrict the amount of aliases for collections (sequences and mappings) to avoid https://en.wikipedia.org/wiki/Billion_laughs_attack
+     * @param maxAliasesForCollections set max allowed value (50 by default)
+     */
     public void setMaxAliasesForCollections(int maxAliasesForCollections) {
     	this.maxAliasesForCollections = maxAliasesForCollections;
     }
@@ -71,7 +77,7 @@ public class LoaderOptions {
     /**
      * Allow recursive keys for mappings. By default it is not allowed.
      * This setting only prevents the case when the key is the value. If the key is only a part of the value
-     * (the value is a sequence or a mapping) then this case is not recognised and always allowed.
+     * (the value is a sequence or a mapping) then this case is not recognized and always allowed.
      * @param allowRecursiveKeys - false to disable recursive keys
      */
     public void setAllowRecursiveKeys(boolean allowRecursiveKeys) {
@@ -80,5 +86,32 @@ public class LoaderOptions {
 
     public boolean getAllowRecursiveKeys() {
         return allowRecursiveKeys;
+    }
+
+    /**
+     * Set the comment processing. By default comments are ignored.
+     *
+     * @param processComments <code>true</code> to process; <code>false</code> to ignore</code>
+     */
+    public void setProcessComments(boolean processComments) {
+        this.processComments = processComments;
+    }
+
+    public boolean isProcessComments() {
+        return processComments;
+    }
+
+    public boolean isEnumCaseSensitive() {
+        return enumCaseSensitive;
+    }
+
+    /**
+     * Disables or enables case sensitivity during construct enum constant from string value
+     * Default is false.
+     *
+     * @param enumCaseSensitive - true to set enum case sensitive, false the reverse
+     */
+    public void setEnumCaseSensitive(boolean enumCaseSensitive) {
+        this.enumCaseSensitive = enumCaseSensitive;
     }
 }

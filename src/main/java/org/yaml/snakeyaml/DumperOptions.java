@@ -171,7 +171,7 @@ public class DumperOptions {
 
     public enum NonPrintableStyle {
         /**
-         * Tranform String to binary if it contains non-printable characters
+         * Transform String to binary if it contains non-printable characters
          */
         BINARY,
         /**
@@ -195,6 +195,7 @@ public class DumperOptions {
     private boolean explicitEnd = false;
     private TimeZone timeZone = null;
     private int maxSimpleKeyLength = 128;
+    private boolean processComments = false;
     private NonPrintableStyle  nonPrintableStyle = NonPrintableStyle.BINARY;
 
     private Version version = null;
@@ -252,6 +253,10 @@ public class DumperOptions {
         return this.indent;
     }
 
+    /**
+     * Set number of white spaces to use for the sequence indicator '-'
+     * @param indicatorIndent value to be used as indent
+     */
     public void setIndicatorIndent(int indicatorIndent) {
         if (indicatorIndent < 0) {
             throw new YAMLException("Indicator indent must be non-negative.");
@@ -270,6 +275,10 @@ public class DumperOptions {
         return indentWithIndicator;
     }
 
+    /**
+     * Set to true to add the indent for sequences to the general indent
+     * @param indentWithIndicator - true when indent for sequences is added to general
+     */
     public void setIndentWithIndicator(boolean indentWithIndicator) {
         this.indentWithIndicator = indentWithIndicator;
     }
@@ -452,6 +461,20 @@ public class DumperOptions {
             throw new YAMLException("The simple key must not span more than 1024 stream characters. See https://yaml.org/spec/1.1/#id934537");
         }
         this.maxSimpleKeyLength = maxSimpleKeyLength;
+    }
+
+    /**
+     * Set the comment processing. By default comments are ignored.
+     *
+     * @param processComments <code>true</code> to process; <code>false</code> to ignore</code>
+     */
+
+    public void setProcessComments(boolean processComments) {
+        this.processComments = processComments;
+    }
+
+    public boolean isProcessComments() {
+        return processComments;
     }
 
     public NonPrintableStyle getNonPrintableStyle() {

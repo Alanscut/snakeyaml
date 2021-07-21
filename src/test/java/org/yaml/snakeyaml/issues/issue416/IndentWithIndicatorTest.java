@@ -36,7 +36,7 @@ public class IndentWithIndicatorTest extends TestCase {
         Yaml yaml = new Yaml(options);
         String output = yaml.dump(createData());
 
-        String doc = Util.getLocalResource("issues/issue416_1.yml");
+        String doc = Util.getLocalResource("issues/issue416-1.yaml");
 
         assertEquals(doc, output);
     }
@@ -51,7 +51,22 @@ public class IndentWithIndicatorTest extends TestCase {
         Yaml yaml = new Yaml(options);
         String output = yaml.dump(createData());
 
-        String doc = Util.getLocalResource("issues/issue416_2.yml");
+        String doc = Util.getLocalResource("issues/issue416-2.yaml");
+
+        assertEquals(doc, output);
+    }
+
+    public void testIndentWithIndicator3() {
+        DumperOptions options = new DumperOptions();
+        options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+        options.setIndentWithIndicator(false);
+        options.setIndent(4);
+        options.setIndicatorIndent(2);
+
+        Yaml yaml = new Yaml(options);
+        String output = yaml.dump(createData());
+
+        String doc = Util.getLocalResource("issues/issue416_3.yml");
 
         assertEquals(doc, output);
     }
